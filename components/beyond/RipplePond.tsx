@@ -168,21 +168,59 @@ export default function RipplePond() {
       ctx!.putImageData(imageData, 0, 0);
     }
 
+    // Measures the ACTUAL rendered header/title/caption instead of guessing
+    // their pixel heights — text wrapping (and therefore how tall they are)
+    // depends on real font metrics and viewport width, which varies by
+    // device in ways fixed pixel guesses kept getting wrong (e.g. the
+    // caption wraps to 4 lines on some phones and only 2 on others).
+    function measureSafeArea() {
+      const margin = 16;
+      const header = document.getElementById("beyond-header");
+      const title = document.getElementById("beyond-title");
+      const caption = document.getElementById("beyond-caption");
+
+      const headerBottom = header ? header.getBoundingClientRect().bottom : 90;
+      const titleBottom = title ? title.getBoundingClientRect().bottom : 300;
+      const captionTop = caption
+        ? caption.getBoundingClientRect().top
+        : H - 160;
+
+      const top = Math.max(headerBottom, titleBottom) + margin;
+      // Guard against a degenerate (too-short or inverted) range on very
+      // short viewports rather than producing negative/NaN positions.
+      const bottom = Math.max(captionTop - margin, top + 100);
+
+      return { left: margin, right: W - margin, top, bottom };
+    }
+
     // Interest positions — fixed, hand-placed layout (see LANDSCAPE_LAYOUT /
-    // PORTRAIT_LAYOUT above) rather than randomized placement. Chosen by
-    // actual aspect ratio, not a fixed width threshold, so an iPad in either
-    // orientation gets the layout suited to its actual shape.
+    // PORTRAIT_LAYOUT above), mapped into the real measured safe area rather
+    // than raw viewport fractions, and chosen by actual aspect ratio (not a
+    // fixed width threshold) so an iPad in either orientation gets the
+    // layout suited to its actual shape.
     function generatePositions(): Point[] {
+      const safe = measureSafeArea();
+      const safeW = safe.right - safe.left;
+      const safeH = safe.bottom - safe.top;
       const layout = W >= H ? LANDSCAPE_LAYOUT : PORTRAIT_LAYOUT;
-      const center: Point = [W / 2, H / 2];
+      const center: Point = [safe.left + safeW / 2, safe.top + safeH / 2];
       return beyondInterests.map((_, i) => {
         const slot = layout[i];
-        return slot ? ([slot.x * W, slot.y * H] as Point) : center;
+        return slot
+          ? ([safe.left + slot.x * safeW, safe.top + slot.y * safeH] as Point)
+          : center;
       });
     }
 
     setPositions(generatePositions());
     setLabelFontSize(getInterestFontSize(W));
+
+    // Fonts can swap in shortly after first paint, subtly changing the
+    // measured height of the title/caption text — re-measure once they're
+    // confirmed loaded so any small discrepancy self-corrects.
+    document.fonts?.ready.then(() => {
+      setPositions(generatePositions());
+    });
 
     function handleResize() {
       resize();
