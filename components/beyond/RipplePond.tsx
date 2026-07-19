@@ -27,10 +27,21 @@ function heightToColor(h: number): [number, number, number] {
 type Point = [number, number];
 type DropFn = (px: number, py: number, strength?: number, radius?: number) => void;
 
+// Fluid label size on mobile — scales down for narrower phones instead of
+// one fixed size for every width under the 760px breakpoint, ceiling at the
+// original 19px (reached around a typical ~390px-wide phone) and floored at
+// 14px so text never gets illegibly small on the narrowest screens. Desktop
+// stays a fixed 24px, unchanged.
+function getInterestFontSize(width: number): number {
+  if (width > 760) return 24;
+  return Math.max(14, Math.min(19, width * (19 / 390)));
+}
+
 export default function RipplePond() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dropRef = useRef<DropFn>(() => {});
   const [positions, setPositions] = useState<Point[]>([]);
+  const [labelFontSize, setLabelFontSize] = useState(24);
   const [visible, setVisible] = useState<boolean[]>(() =>
     beyondInterests.map(() => false)
   );
@@ -115,40 +126,105 @@ export default function RipplePond() {
       ctx!.putImageData(imageData, 0, 0);
     }
 
-    // Interest positions, randomized each visit — confined to a circle so the
+    // Interest positions, randomized each visit — confined to a region so the
     // whole cluster reads as one group instead of scattering across the page.
     // Reserved rectangles keep labels clear of the header/title/caption text;
     // the ripple simulation itself is unaffected and still spans the full page.
     function generatePositions(): Point[] {
-      const placed: Point[] = [];
-      const minDist = Math.min(W, H) * 0.15;
-      const circleCx = W * 0.5;
-      const circleCy = H * 0.54;
-      const circleRadius = Math.min(W, H) * 0.32;
+      const isMobile = W <= 760;
+
+      if (!isMobile) {
+        // Desktop: unchanged from the original circle-based layout.
+        const placed: Point[] = [];
+        const minDist = Math.min(W, H) * 0.15;
+        const circleCx = W * 0.5;
+        const circleCy = H * 0.54;
+        const circleRadius = Math.min(W, H) * 0.32;
+
+        const reserved: [number, number, number, number][] = [
+          [0, 0, W, 90], // header
+          [0, 60, 480, 300], // title block
+          [W - 640, H - 160, W, H], // concept caption (wide, single-line text)
+        ];
+        function inReserved(x: number, y: number) {
+          return reserved.some(
+            ([x1, y1, x2, y2]) => x >= x1 && x <= x2 && y >= y1 && y <= y2
+          );
+        }
+        function randomPointInCircle(): Point {
+          const angle = Math.random() * Math.PI * 2;
+          const r = circleRadius * Math.sqrt(Math.random());
+          return [circleCx + r * Math.cos(angle), circleCy + r * Math.sin(angle)];
+        }
+
+        for (let i = 0; i < beyondInterests.length; i++) {
+          let best: Point | null = null;
+          for (let attempt = 0; attempt < 300; attempt++) {
+            const [x, y] = randomPointInCircle();
+            if (inReserved(x, y)) continue;
+            const tooClose = placed.some(
+              (p) => Math.hypot(p[0] - x, p[1] - y) < minDist
+            );
+            if (!tooClose) {
+              best = [x, y];
+              break;
+            }
+            if (!best) best = [x, y];
+          }
+          placed.push(best || [circleCx, circleCy]);
+        }
+        return placed;
+      }
+
+      // Mobile: a circle sized off Math.min(W, H) is tiny on a narrow, tall
+      // screen (bounded by width even though there's plenty of vertical
+      // room) — use an ellipse shaped to the actual safe area between the
+      // header/title and the caption instead. Spacing is also per-label,
+      // based on each word's estimated rendered width at the same fluid
+      // font size actually being rendered, rather than one fixed distance
+      // shared by "F1" and "Philosophy" alike.
+      const fontSize = getInterestFontSize(W);
+      const gap = 14;
+      const marginX = 20;
+      const topBound = 230; // clears the header + wrapped title/intro text
+      const bottomBound = H - 180; // clears the concept caption
+
+      const ellipseCx = W / 2;
+      const ellipseCy = (topBound + bottomBound) / 2;
+      const ellipseRx = Math.max(W / 2 - marginX, 40);
+      const ellipseRy = Math.max((bottomBound - topBound) / 2, 60);
 
       const reserved: [number, number, number, number][] = [
-        [0, 0, W, 90], // header
-        [0, 60, 480, 300], // title block
-        [W - 640, H - 160, W, H], // concept caption (wide, single-line text)
+        [0, 0, W, 90],
+        [0, 60, W, topBound],
+        [0, bottomBound, W, H],
       ];
       function inReserved(x: number, y: number) {
         return reserved.some(
           ([x1, y1, x2, y2]) => x >= x1 && x <= x2 && y >= y1 && y <= y2
         );
       }
-      function randomPointInCircle(): Point {
+      function randomPointInEllipse(): Point {
         const angle = Math.random() * Math.PI * 2;
-        const r = circleRadius * Math.sqrt(Math.random());
-        return [circleCx + r * Math.cos(angle), circleCy + r * Math.sin(angle)];
+        const r = Math.sqrt(Math.random());
+        return [
+          ellipseCx + r * ellipseRx * Math.cos(angle),
+          ellipseCy + r * ellipseRy * Math.sin(angle),
+        ];
+      }
+      function halfWidth(text: string) {
+        return (text.length * fontSize * 0.5) / 2 + gap;
       }
 
+      const placed: { x: number; y: number; halfWidth: number }[] = [];
       for (let i = 0; i < beyondInterests.length; i++) {
+        const hw = halfWidth(beyondInterests[i]);
         let best: Point | null = null;
-        for (let attempt = 0; attempt < 300; attempt++) {
-          const [x, y] = randomPointInCircle();
+        for (let attempt = 0; attempt < 400; attempt++) {
+          const [x, y] = randomPointInEllipse();
           if (inReserved(x, y)) continue;
           const tooClose = placed.some(
-            (p) => Math.hypot(p[0] - x, p[1] - y) < minDist
+            (p) => Math.hypot(p.x - x, p.y - y) < hw + p.halfWidth
           );
           if (!tooClose) {
             best = [x, y];
@@ -156,16 +232,19 @@ export default function RipplePond() {
           }
           if (!best) best = [x, y];
         }
-        placed.push(best || [circleCx, circleCy]);
+        const [x, y] = best || [ellipseCx, ellipseCy];
+        placed.push({ x, y, halfWidth: hw });
       }
-      return placed;
+      return placed.map((p): Point => [p.x, p.y]);
     }
 
     setPositions(generatePositions());
+    setLabelFontSize(getInterestFontSize(W));
 
     function handleResize() {
       resize();
       setPositions(generatePositions());
+      setLabelFontSize(getInterestFontSize(W));
     }
     window.addEventListener("resize", handleResize);
 
@@ -276,12 +355,13 @@ export default function RipplePond() {
       {positions.map(([x, y], i) => (
         <span
           key={beyondInterests[i]}
-          className="interest-label fixed z-[15] -translate-x-1/2 -translate-y-1/2 cursor-pointer text-[19px] whitespace-nowrap text-ink/90 transition-opacity duration-[1100ms] ease-out select-none min-[761px]:text-[24px]"
+          className="interest-label fixed z-[15] -translate-x-1/2 -translate-y-1/2 cursor-pointer whitespace-nowrap text-ink/90 transition-opacity duration-[1100ms] ease-out select-none"
           style={{
             left: x,
             top: y,
             opacity: visible[i] ? 1 : 0,
             fontFamily: "var(--font-display)",
+            fontSize: labelFontSize,
           }}
           onMouseEnter={handleInterestEnter}
           onClick={handleInterestClick}
