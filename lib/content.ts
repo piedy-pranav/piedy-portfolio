@@ -5,7 +5,7 @@
 // ("All copy in this file is PLACEHOLDER unless marked final").
 
 export const landing = {
-  lede: "I turn messy data into decisions that drive businesses forward.",
+  lede: "I turn ambiguous business problems into actionable data-driven decisions",
   body: "UCLA MSBA Candidate | Analyst | Builder",
 };
 
