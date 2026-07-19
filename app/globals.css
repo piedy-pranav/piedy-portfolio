@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+/* Class-based dark mode so the interior ThemeToggle can override prefers-color-scheme */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #050505;
+  --bg-int: #f7f5f0;
+  --bg-int-dark: #0a0a0c;
+  --ink: #f2f0ea;
+  --ink-int: #16161a;
+
+  --beam-work: #ff2a1a;
+  --beam-beyond: #ffd500;
+  --beam-contact: #1e6fff;
+
+  --font-display: var(--font-eb-garamond);
+  --font-body: var(--font-inter);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-int: var(--bg-int);
+  --color-bg-int-dark: var(--bg-int-dark);
+  --color-ink: var(--ink);
+  --color-ink-int: var(--ink-int);
+
+  --color-beam-work: var(--beam-work);
+  --color-beam-beyond: var(--beam-beyond);
+  --color-beam-contact: var(--beam-contact);
+
+  --font-display: var(--font-eb-garamond);
+  --font-body: var(--font-inter);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+/* Elastic/rubber-band overscroll reveals the <html> background above the
+   scrollable content — default it to the interior background (light/dark)
+   so that overscroll shows a matching color instead of a flash of white.
+   The landing page is its own full-bleed, non-scrolling black stage, so it
+   isn't affected by this. */
+html {
+  background-color: var(--bg-int);
+}
+
+html.dark {
+  background-color: var(--bg-int-dark);
+}
+
+body {
+  font-family: var(--font-body), sans-serif;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* ---- Landing "Prism" beam interaction (DESIGN.md §4.3) ---- */
+/* Rest state: faint white light. Ignites to full beam color on hover/focus. */
+
+.beam-shape {
+  fill: none;
+  stroke: rgba(242, 240, 234, 0.14);
+  stroke-width: 2px;
+  stroke-linecap: round;
+  filter: none;
+  transition:
+    stroke 0.3s ease,
+    filter 0.3s ease;
+}
+
+.beam-link:hover .beam-shape,
+.beam-link:focus-visible .beam-shape {
+  stroke: var(--beam-color);
+  filter: drop-shadow(0 0 18px var(--beam-color));
+}
+
+/* Invisible generous hover/click target — the visible beam is a thin line */
+.beam-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 36px;
+}
+
+.beam-link {
+  outline: none;
+  cursor: pointer;
+}
+
+.beam-label {
+  fill: rgba(242, 240, 234, 0.6);
+  transition: fill 0.3s ease;
+}
+
+.beam-link:hover .beam-label,
+.beam-link:focus-visible .beam-label {
+  fill: var(--ink);
+}
+
+/* Sibling dimming: when any beam is engaged, the other two recede further. */
+.prism-stage svg:has(.beam-link:hover) .beam-link:not(:hover) .beam-shape,
+.prism-stage
+  svg:has(.beam-link:focus-visible)
+  .beam-link:not(:focus-visible)
+  .beam-shape {
+  stroke: rgba(242, 240, 234, 0.06);
+}
+
+.prism-stage svg:has(.beam-link:hover) .beam-link:not(:hover) .beam-label,
+.prism-stage
+  svg:has(.beam-link:focus-visible)
+  .beam-link:not(:focus-visible)
+  .beam-label {
+  fill: rgba(242, 240, 234, 0.3);
+}
+
+/* ---- Interior fade-up on scroll (DESIGN.md §6) ---- */
+.fade-up {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+.fade-up.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ---- Interior nav (DESIGN.md §5.1) ---- */
+.nav-link {
+  transition: border-color 0.25s ease;
+}
+
+.nav-link:hover {
+  border-bottom-color: var(--nav-color);
+}
+
+/* ---- Accessibility: visible focus states everywhere (DESIGN.md §7) ---- */
+/* .beam-link is excluded: the landing beams get their own focus treatment
+   (ignition + polygon stroke, §4.3) instead of this generic rectangle. */
+a:focus-visible:not(.beam-link),
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Contact form fields keep the section's own accent (blue) as their focus
+   ring in both light and dark mode, instead of the generic ink-colored one
+   above (which read as black in light mode, white in dark mode). */
+.contact-field:focus-visible {
+  outline-color: var(--beam-contact);
+}
+
+/* ---- Beyond page: ripple pond interest labels ---- */
+.interest-label:hover {
+  color: #f2a88f;
+}
+
+.interest-label::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 4px;
+  height: 4px;
+  margin-top: 34px;
+  border-radius: 50%;
+  background: rgba(126, 214, 223, 0.7);
+  transform: translateX(-50%);
+}
