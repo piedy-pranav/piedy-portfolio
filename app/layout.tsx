@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EB_Garamond, Inter } from "next/font/google";
 import Script from "next/script";
+import { landing } from "@/lib/content";
 import "./globals.css";
 
 const ebGaramond = EB_Garamond({
@@ -21,19 +22,19 @@ export const metadata: Metadata = {
     default: "Pranav Piedy",
     template: "%s — Pranav Piedy",
   },
-  description: "I turn messy data into decisions worth making.",
+  description: landing.lede,
   icons: {
     icon: "/favicon.svg",
   },
   openGraph: {
     title: "Pranav Piedy",
-    description: "I turn messy data into decisions worth making.",
+    description: landing.lede,
     images: [{ url: "/website-photo.jpg", width: 724, height: 965 }],
   },
   twitter: {
     card: "summary",
     title: "Pranav Piedy",
-    description: "I turn messy data into decisions worth making.",
+    description: landing.lede,
     images: ["/website-photo.jpg"],
   },
 };
