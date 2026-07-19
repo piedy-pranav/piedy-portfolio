@@ -26,16 +26,58 @@ function heightToColor(h: number): [number, number, number] {
 
 type Point = [number, number];
 type DropFn = (px: number, py: number, strength?: number, radius?: number) => void;
+type LayoutSlot = { x: number; y: number }; // fractions of viewport width/height
 
-// Fluid label size on mobile — scales down for narrower phones instead of
-// one fixed size for every width under the 760px breakpoint, ceiling at the
-// original 19px (reached around a typical ~390px-wide phone) and floored at
-// 14px so text never gets illegibly small on the narrowest screens. Desktop
-// stays a fixed 24px, unchanged.
+// Fluid label size — scales continuously with viewport width rather than
+// jumping between two fixed sizes at one breakpoint. Floors at 13px (small
+// phones) and ceilings at 24px (large desktop); iPad-ish widths in between
+// land somewhere in the middle, which also gives the fixed layouts below
+// more breathing room than a flat 24px would at those in-between sizes.
 function getInterestFontSize(width: number): number {
-  if (width > 760) return 24;
-  return Math.max(14, Math.min(19, width * (19 / 390)));
+  if (width <= 390) return Math.max(13, width * (16 / 390));
+  if (width >= 1400) return 24;
+  const t = (width - 390) / (1400 - 390);
+  return 16 + t * (24 - 16);
 }
+
+// Fixed, hand-placed positions — index-aligned with `beyondInterests` in
+// lib/content.ts. If you add, remove, or reorder interests there, update
+// these arrays to match (extra interests beyond a layout's length just fall
+// back to the center point rather than breaking).
+//
+// Landscape (wider than tall — desktop, tablets held sideways): a 4x3 grid
+// with one corner slot unused, kept clear of the header, the title (upper
+// area), and the caption (lower area).
+const LANDSCAPE_LAYOUT: LayoutSlot[] = [
+  { x: 0.66, y: 0.34 }, // Football
+  { x: 0.66, y: 0.78 }, // Tabla
+  { x: 0.48, y: 0.56 }, // Guitar
+  { x: 0.66, y: 0.56 }, // Formula 1
+  { x: 0.48, y: 0.34 }, // Gym
+  { x: 0.3, y: 0.56 }, // Camping
+  { x: 0.3, y: 0.78 }, // Hiking
+  { x: 0.84, y: 0.34 }, // Taekwondo
+  { x: 0.48, y: 0.78 }, // Cooking
+  { x: 0.3, y: 0.34 }, // Philosophy
+  { x: 0.84, y: 0.78 }, // Coffee
+];
+
+// Portrait (taller than wide — phones, tablets held upright): a 2/1
+// alternating "brick" pattern down the safe vertical band, so neighboring
+// labels sit on a diagonal rather than stacked directly above one another.
+const PORTRAIT_LAYOUT: LayoutSlot[] = [
+  { x: 0.28, y: 0.3 }, // Football
+  { x: 0.5, y: 0.758 }, // Tabla
+  { x: 0.5, y: 0.392 }, // Guitar
+  { x: 0.5, y: 0.575 }, // Formula 1
+  { x: 0.28, y: 0.85 }, // Gym
+  { x: 0.72, y: 0.483 }, // Camping
+  { x: 0.28, y: 0.667 }, // Hiking
+  { x: 0.72, y: 0.3 }, // Taekwondo
+  { x: 0.72, y: 0.667 }, // Cooking
+  { x: 0.28, y: 0.483 }, // Philosophy
+  { x: 0.72, y: 0.85 }, // Coffee
+];
 
 export default function RipplePond() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -126,116 +168,17 @@ export default function RipplePond() {
       ctx!.putImageData(imageData, 0, 0);
     }
 
-    // Interest positions, randomized each visit — confined to a region so the
-    // whole cluster reads as one group instead of scattering across the page.
-    // Reserved rectangles keep labels clear of the header/title/caption text;
-    // the ripple simulation itself is unaffected and still spans the full page.
+    // Interest positions — fixed, hand-placed layout (see LANDSCAPE_LAYOUT /
+    // PORTRAIT_LAYOUT above) rather than randomized placement. Chosen by
+    // actual aspect ratio, not a fixed width threshold, so an iPad in either
+    // orientation gets the layout suited to its actual shape.
     function generatePositions(): Point[] {
-      const isMobile = W <= 760;
-
-      if (!isMobile) {
-        // Desktop: unchanged from the original circle-based layout.
-        const placed: Point[] = [];
-        const minDist = Math.min(W, H) * 0.15;
-        const circleCx = W * 0.5;
-        const circleCy = H * 0.54;
-        const circleRadius = Math.min(W, H) * 0.32;
-
-        const reserved: [number, number, number, number][] = [
-          [0, 0, W, 90], // header
-          [0, 60, 480, 300], // title block
-          [W - 640, H - 160, W, H], // concept caption (wide, single-line text)
-        ];
-        function inReserved(x: number, y: number) {
-          return reserved.some(
-            ([x1, y1, x2, y2]) => x >= x1 && x <= x2 && y >= y1 && y <= y2
-          );
-        }
-        function randomPointInCircle(): Point {
-          const angle = Math.random() * Math.PI * 2;
-          const r = circleRadius * Math.sqrt(Math.random());
-          return [circleCx + r * Math.cos(angle), circleCy + r * Math.sin(angle)];
-        }
-
-        for (let i = 0; i < beyondInterests.length; i++) {
-          let best: Point | null = null;
-          for (let attempt = 0; attempt < 300; attempt++) {
-            const [x, y] = randomPointInCircle();
-            if (inReserved(x, y)) continue;
-            const tooClose = placed.some(
-              (p) => Math.hypot(p[0] - x, p[1] - y) < minDist
-            );
-            if (!tooClose) {
-              best = [x, y];
-              break;
-            }
-            if (!best) best = [x, y];
-          }
-          placed.push(best || [circleCx, circleCy]);
-        }
-        return placed;
-      }
-
-      // Mobile: a circle sized off Math.min(W, H) is tiny on a narrow, tall
-      // screen (bounded by width even though there's plenty of vertical
-      // room) — use an ellipse shaped to the actual safe area between the
-      // header/title and the caption instead. Spacing is also per-label,
-      // based on each word's estimated rendered width at the same fluid
-      // font size actually being rendered, rather than one fixed distance
-      // shared by "F1" and "Philosophy" alike.
-      const fontSize = getInterestFontSize(W);
-      const gap = 14;
-      const marginX = 20;
-      const topBound = 230; // clears the header + wrapped title/intro text
-      const bottomBound = H - 180; // clears the concept caption
-
-      const ellipseCx = W / 2;
-      const ellipseCy = (topBound + bottomBound) / 2;
-      const ellipseRx = Math.max(W / 2 - marginX, 40);
-      const ellipseRy = Math.max((bottomBound - topBound) / 2, 60);
-
-      const reserved: [number, number, number, number][] = [
-        [0, 0, W, 90],
-        [0, 60, W, topBound],
-        [0, bottomBound, W, H],
-      ];
-      function inReserved(x: number, y: number) {
-        return reserved.some(
-          ([x1, y1, x2, y2]) => x >= x1 && x <= x2 && y >= y1 && y <= y2
-        );
-      }
-      function randomPointInEllipse(): Point {
-        const angle = Math.random() * Math.PI * 2;
-        const r = Math.sqrt(Math.random());
-        return [
-          ellipseCx + r * ellipseRx * Math.cos(angle),
-          ellipseCy + r * ellipseRy * Math.sin(angle),
-        ];
-      }
-      function halfWidth(text: string) {
-        return (text.length * fontSize * 0.5) / 2 + gap;
-      }
-
-      const placed: { x: number; y: number; halfWidth: number }[] = [];
-      for (let i = 0; i < beyondInterests.length; i++) {
-        const hw = halfWidth(beyondInterests[i]);
-        let best: Point | null = null;
-        for (let attempt = 0; attempt < 400; attempt++) {
-          const [x, y] = randomPointInEllipse();
-          if (inReserved(x, y)) continue;
-          const tooClose = placed.some(
-            (p) => Math.hypot(p.x - x, p.y - y) < hw + p.halfWidth
-          );
-          if (!tooClose) {
-            best = [x, y];
-            break;
-          }
-          if (!best) best = [x, y];
-        }
-        const [x, y] = best || [ellipseCx, ellipseCy];
-        placed.push({ x, y, halfWidth: hw });
-      }
-      return placed.map((p): Point => [p.x, p.y]);
+      const layout = W >= H ? LANDSCAPE_LAYOUT : PORTRAIT_LAYOUT;
+      const center: Point = [W / 2, H / 2];
+      return beyondInterests.map((_, i) => {
+        const slot = layout[i];
+        return slot ? ([slot.x * W, slot.y * H] as Point) : center;
+      });
     }
 
     setPositions(generatePositions());
