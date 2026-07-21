@@ -9,12 +9,16 @@ export const landing = {
   body: "UCLA MSBA Candidate | Analyst | Builder",
 };
 
+export interface CaseStudyLink {
+  label: string;
+  href: string;
+}
+
 export interface CaseStudy {
   eyebrow: string;
   title: string;
   summary: string;
-  linkLabel?: string;
-  linkHref?: string;
+  links?: CaseStudyLink[];
 }
 
 export const caseStudies: CaseStudy[] = [
@@ -22,36 +26,36 @@ export const caseStudies: CaseStudy[] = [
     eyebrow: "Strategy · Analytics",
     title: "Copart Strategy Analytics Internship",
     summary: "Currently working on Search Optimization for Copart's Product Search Functionality.",
-    linkLabel: "",
-    linkHref: "",
   },
   {
     eyebrow: "Strategy · Growth Analytics ",
     title: "University Credit Union - Market Expansion Strategy",
     summary: "Developed strategic prioritization framework across 14 university partner segments; synthesized market potential (428K+ addressable audience) vs. current penetration (13.2%) to pinpoint high-ROI expansion targets and direct go-to-market resource allocation.",
-    linkLabel: "Read more →",
-    linkHref: "https://piedy-pranav.github.io/ucu-growth-dashboard",
+    links: [
+      { label: "Read more →", href: "https://piedy-pranav.github.io/ucu-growth-dashboard" },
+    ],
   },
   {
     eyebrow: "Agentic AI · Consulting",
     title: "Multi-agent AI systems (PwC / Grant Thornton)",
     summary: "Prototyped a multi-agent AI solutions (LangGraph) for invoice reconciliation, cutting turnaround 60% and unlocking $600K in projected annual savings.",
-    linkLabel: "",
-    linkHref: "",
   },
   {
     eyebrow: "Data Science · Causal Inference",
     title: "Geospatial Causal Inference of NYC's Surge Pricing and Subway Ridership",
     summary: "Evaluated a $1.50 congestion surcharge using causal inference. Found 15-17% ride-hail reduction and identified mobility deserts, informing equity-focused policy recommendations. Analyzed 34M+ rows of ride-hail, transit, and weather data.",
-    linkLabel: "Read more →",
-    linkHref: "https://github.com/piedy-pranav/NYC-Congestion-Pricing",
+    links: [
+      { label: "Read more →", href: "https://github.com/piedy-pranav/NYC-Congestion-Pricing" },
+      { label: "Slides →", href: "https://docs.google.com/presentation/d/1DBoVfQUKZJiSBeofw6PtxsraPdW2FGywH1IyuNniWx8/edit?usp=sharing" },
+    ],
   },
   {
     eyebrow: "Data Science · Case Analysis",
     title: "Case Analysis (MSBA)",
     summary: "Analyzed real-world business cases to derive actionable insights and strategic recommendations for VP-level stakeholders.",
-    linkLabel: "Read more →",
-    linkHref: "https://github.com/piedy-pranav/Case-Analysis-MSBA",
+    links: [
+      { label: "Read more →", href: "https://github.com/piedy-pranav/Case-Analysis-MSBA" },
+    ],
   }
 ];
 

@@ -12,13 +12,20 @@ export default function CaseStudyCard({ study }: { study: CaseStudy }) {
       <p className="mt-3 text-[15px] leading-[1.7] text-ink-int/65 dark:text-ink/60">
         {study.summary}
       </p>
-      {study.linkHref && (
-        <a
-          href={study.linkHref}
-          className="mt-4 inline-block text-[13px] text-beam-work"
-        >
-          {study.linkLabel}
-        </a>
+      {study.links && study.links.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+          {study.links.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[13px] text-beam-work"
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
       )}
     </div>
   );
